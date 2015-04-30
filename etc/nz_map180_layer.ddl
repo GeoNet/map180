@@ -55,11 +55,19 @@ insert into public.map180_layers (region,zoom,type,geom) select 1,2,0,
 insert into public.map180_layers (region,zoom,type,geom) select 1,2,1,  
 	ST_Multi(ST_Transform(geom,3857)) from public.nztopo_1500k_lakes  where st_area(geom) *111*111 > 0.5;
 
+-- Delete CVZ water features and then re-add with small ones
+delete from public.map180_layers where not ST_IsEmpty(ST_Intersection(ST_Transform(ST_MakeEnvelope(175.45,-39.4,175.8,-39.0, 4326),3857),geom)) 
+	and zoom =2 and type =1;
+insert into public.map180_layers (region,zoom,type,geom) select 1,2,1,  
+	ST_Multi(ST_Transform(ST_Intersection(ST_MakeEnvelope(175.45,-39.4,175.8,-39.0, 4326), geom),3857)) from public.nztopo_1500k_lakes  
+ where Not ST_IsEmpty(ST_Intersection(ST_MakeEnvelope(175.45,-39.4,175.8,-39.0, 4326), geom)) ;
+
+
 --  Raoul is missing from 1500k.  Add it using filtered 50k
 insert into public.map180_layers (region,zoom,type,geom) select 1,2,0,  
 	ST_Multi(ST_Transform(ST_Intersection(ST_MakeEnvelope(182.0,-29.30,182.14,-29.22, 4326), geom),3857)) 
  from public.nztopo_150k_land where 
- Not ST_IsEmpty(ST_Intersection(ST_MakeEnvelope(182.0,-29.30,182.14,-29.22, 4326), geom)) and st_area(geom) *111 *111 > 0.5;
+  not ST_IsEmpty(ST_Intersection(ST_MakeEnvelope(182.0,-29.30,182.14,-29.22, 4326), geom)) and st_area(geom) *111 *111 > 0.5;
 
 
 -- Chathams missing from 1500k, use 1250k files.
@@ -68,7 +76,6 @@ insert into public.map180_layers (region,zoom,type,geom) select 1,2,0,  ST_Multi
  insert into public.map180_layers (region,zoom,type,geom) select 1,2,1,  ST_Multi(ST_Transform(geom,3857))
  from public.nztopo_1250k_chathams_lagoon ;
 
-
 --
 -- zoom 3: 150k small feaures removed for performance 
 --
@@ -76,6 +83,13 @@ insert into public.map180_layers (region,zoom,type,geom) select 1,3,0,
 	ST_Multi(ST_Transform(geom,3857)) from public.nztopo_150k_land where st_area(geom) *111*111 > 0.2;
 insert into public.map180_layers (region,zoom,type,geom) select 1,3,1,  
 	ST_Multi(ST_Transform(geom,3857)) from public.nztopo_150k_lakes where st_area(geom) *111*111 > 0.5 ;
+
+-- Delete CVZ water features and then re-add with small ones
+delete from public.map180_layers where not ST_IsEmpty(ST_Intersection(ST_Transform(ST_MakeEnvelope(175.45,-39.4,175.8,-39.0, 4326),3857),geom)) 
+	and zoom =3 and type =1;
+insert into public.map180_layers (region,zoom,type,geom) select 1,3,1,  
+	ST_Multi(ST_Transform(ST_Intersection(ST_MakeEnvelope(175.45,-39.4,175.8,-39.0, 4326), geom),3857)) from public.nztopo_150k_land
+where Not ST_IsEmpty(ST_Intersection(ST_MakeEnvelope(175.45,-39.4,175.8,-39.0, 4326), geom)) ;
 
 
 -- Delete Raoul at zoom 3.  Then put data back with all small features.
