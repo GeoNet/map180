@@ -1,0 +1,252 @@
+package map180
+
+import (
+	"bytes"
+	"database/sql"
+	"fmt"
+	"github.com/GeoNet/cfg"
+	_ "github.com/lib/pq"
+	"io/ioutil"
+	"log"
+	"testing"
+)
+
+var iconWidth = 100
+
+func TestIconNewZealand(t *testing.T) {
+	pg := cfg.DataBase{
+		Host:              "localhost",
+		Name:              "fits",
+		User:              "fits_r",
+		Password:          "test",
+		SSLMode:           "disable",
+		MaxOpenConns:      1,
+		MaxIdleConns:      1,
+		ConnectionTimeOut: 5,
+	}
+
+	db, err := sql.Open("postgres", pg.Postgres())
+	if err != nil {
+		log.Fatalf("ERROR: problem with DB config: %s", err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		log.Fatal("can't ping DB")
+	}
+	defer db.Close()
+
+	wm, err := Init(db, Region(`newzealand`), 256000000)
+	if err != nil {
+		log.Fatalf("ERROR: problem with map180 init: %s", err)
+	}
+
+	_ = wm
+
+	// New Zealand icon map - lon lat grid at 0.1 degrees
+	b, err := newBbox("165,-48,180,-34")
+	if err != nil {
+		t.Fatal("Getting bbox " + err.Error())
+	}
+
+	m, err := b.newMap3857(iconWidth)
+	if err != nil {
+		t.Fatal("Getting map " + err.Error())
+	}
+
+	land, err := m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		t.Fatal("Getting land " + err.Error())
+	}
+
+	lakes, err := m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		t.Fatal("Getting coast")
+	}
+
+	var buf bytes.Buffer
+
+	buf.WriteString(`<?xml version="1.0"?>`)
+	buf.WriteString(fmt.Sprintf("<svg height=\"%d\" width=\"%d\" xmlns=\"http://www.w3.org/2000/svg\">",
+		m.height, m.width))
+	buf.WriteString(`<title>Map of New Zealand.</title>`)
+	buf.WriteString(fmt.Sprintf("<path fill=\"whitesmoke\" stroke-width=\"0.75\"  stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>", land))
+	buf.WriteString(fmt.Sprintf("<path fill=\"white\" stroke-width=\"0.75\"  stroke=\"lightslategrey\" d=\"%s\"/>", lakes))
+
+	var out bytes.Buffer
+
+	out.WriteString("package nzmap\n")
+	out.WriteString("var nzIcon = `" + buf.String() + "`\n\n")
+	out.WriteString("func init() {\n")
+
+	for x := 165.0; x <= 180.0; x = x + 0.1 {
+		for y := -48.0; y <= -34.0; y = y + 0.1 {
+			p := NewMarker(x, y, "", "", "")
+			m.marker3857(&p)
+			out.WriteString(fmt.Sprintf("nzIconPts[%.f][%.f] = pt{x:%d, y:%d}\n", x*10-1650, y*10+480, int(p.x), int(p.y)))
+		}
+	}
+	out.WriteString("}\n")
+
+	err = ioutil.WriteFile("/tmp/nzicon.go", out.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// New Zealand, Raoul, Chathams icon map.  1 degree grid.
+	// the bbox is slightly larger than the grid to make the height the same as other
+	// icon maps.
+	b, err = newBbox("165,-48,-167.4,-20")
+	if err != nil {
+		t.Fatal("Getting bbox " + err.Error())
+	}
+
+	m, err = b.newMap3857(iconWidth)
+	if err != nil {
+		t.Fatal("Getting map " + err.Error())
+	}
+
+	land, err = m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		t.Fatal("Getting land " + err.Error())
+	}
+
+	lakes, err = m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		t.Fatal("Getting coast " + err.Error())
+	}
+
+	buf.Reset()
+
+	buf.WriteString(`<?xml version="1.0"?>`)
+	buf.WriteString(fmt.Sprintf("<svg height=\"%d\" width=\"%d\" xmlns=\"http://www.w3.org/2000/svg\">",
+		m.height, m.width))
+	buf.WriteString(`<title>Map of New Zealand.</title>`)
+	buf.WriteString(fmt.Sprintf("<path fill=\"whitesmoke\" stroke-width=\"0.75\"  stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>", land))
+	buf.WriteString(fmt.Sprintf("<path fill=\"white\" stroke-width=\"0.75\"  stroke=\"lightslategrey\" d=\"%s\"/>", lakes))
+
+	out.Reset()
+
+	out.WriteString("package nzmap\n")
+	out.WriteString("var nzrcIcon = `" + buf.String() + "`\n\n")
+	out.WriteString("func init() {\n")
+
+	var xs float64
+	for x := 165.0; x <= 192; x++ {
+		xs = x
+		if x > 180 {
+			xs = xs - 360
+		}
+		for y := -48.0; y <= -20.0; y++ {
+			p := NewMarker(xs, y, "", "", "")
+			m.marker3857(&p)
+			out.WriteString(fmt.Sprintf("nzrcIconPts[%.f][%.f] = pt{x:%d, y:%d}\n", x-165, y+48, int(p.x), int(p.y)))
+		}
+	}
+	out.WriteString("}\n")
+
+	err = ioutil.WriteFile("/tmp/nzrcicon.go", out.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// New Zealand, Southern Ocean icon map.  1 degree grid.
+	b, err = newBbox("156,-55,180,-34")
+	if err != nil {
+		t.Fatal("Getting bbox " + err.Error())
+	}
+
+	m, err = b.newMap3857(iconWidth)
+	if err != nil {
+		t.Fatal("Getting map " + err.Error())
+	}
+
+	land, err = m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		t.Fatal("Getting land " + err.Error())
+	}
+
+	lakes, err = m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		t.Fatal("Getting coast " + err.Error())
+	}
+
+	buf.Reset()
+
+	buf.WriteString(`<?xml version="1.0"?>`)
+	buf.WriteString(fmt.Sprintf("<svg height=\"%d\" width=\"%d\" xmlns=\"http://www.w3.org/2000/svg\">",
+		m.height, m.width))
+	buf.WriteString(`<title>Map of New Zealand.</title>`)
+	buf.WriteString(fmt.Sprintf("<path fill=\"whitesmoke\" stroke-width=\"0.75\"  stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>", land))
+	buf.WriteString(fmt.Sprintf("<path fill=\"white\" stroke-width=\"0.75\"  stroke=\"lightslategrey\" d=\"%s\"/>", lakes))
+
+	out.Reset()
+
+	out.WriteString("package nzmap\n")
+	out.WriteString("var nzsIcon = `" + buf.String() + "`\n\n")
+	out.WriteString("func init() {\n")
+
+	for x := 156.0; x <= 180.0; x++ {
+		for y := -55.0; y <= -34.0; y++ {
+			p := NewMarker(x, y, "", "", "")
+			m.marker3857(&p)
+			out.WriteString(fmt.Sprintf("nzsIconPts[%.f][%.f] = pt{x:%d, y:%d}\n", x-156, y+55, int(p.x), int(p.y)))
+		}
+	}
+	out.WriteString("}\n")
+
+	err = ioutil.WriteFile("/tmp/nzsicon.go", out.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// New Zealand map - lon lat grid at 0.1 degrees
+	b, err = newBbox("165,-48,180,-34")
+	if err != nil {
+		t.Fatal("Getting bbox " + err.Error())
+	}
+
+	m, err = b.newMap3857(500)
+	if err != nil {
+		t.Fatal("Getting map " + err.Error())
+	}
+
+	land, err = m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		t.Fatal("Getting land " + err.Error())
+	}
+
+	lakes, err = m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		t.Fatal("Getting coast")
+	}
+
+	buf.Reset()
+
+	buf.WriteString(`<?xml version="1.0"?>`)
+	buf.WriteString(fmt.Sprintf("<svg  viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\">",
+		 m.width, m.height))
+	buf.WriteString(`<title>Map of New Zealand.</title>`)
+	buf.WriteString(fmt.Sprintf("<path fill=\"whitesmoke\" stroke-width=\"0.75\"  stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>", land))
+	buf.WriteString(fmt.Sprintf("<path fill=\"white\" stroke-width=\"0.75\"  stroke=\"lightslategrey\" d=\"%s\"/>", lakes))
+
+	out.Reset()
+
+	out.WriteString("package nzmap\n")
+	out.WriteString("var nzMedium = `" + buf.String() + "`\n\n")
+	out.WriteString("func init() {\n")
+
+	for x := 165.0; x <= 180.0; x = x + 0.1 {
+		for y := -48.0; y <= -34.0; y = y + 0.1 {
+			p := NewMarker(x, y, "", "", "")
+			m.marker3857(&p)
+			out.WriteString(fmt.Sprintf("nzMediumPts[%.f][%.f] = pt{x:%d, y:%d}\n", x*10-1650, y*10+480, int(p.x), int(p.y)))
+		}
+	}
+	out.WriteString("}\n")
+
+	err = ioutil.WriteFile("/tmp/nzmedium.go", out.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
