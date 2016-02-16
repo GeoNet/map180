@@ -36,10 +36,12 @@ type pt struct {
 }
 
 type Point struct {
-	Longitude, Latitude float64
-	x, y                int
-	visible             bool
-	Value               float64 // Points can be sorted by Value.
+	Longitude, Latitude   float64
+	x, y                  int
+	visible               bool
+	Value                 float64 // Points can be sorted by Value.
+	Stroke, Fill, Opacity string  // Optional for any later drawing funcs
+	Size                  int     // Optional for any later drawing funcs
 }
 
 type Points []Point
