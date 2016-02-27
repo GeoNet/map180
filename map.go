@@ -214,6 +214,109 @@ func (w *Map180) SVG(boundingBox string, width int, markers []Marker, insetBbox 
 	return
 }
 
+/*
+Map draws an SVG image to buf for the bbox regions.  The returned map uses EPSG3857.
+Width is the SVG image width in pixels (height is calculated). pts haz X Y and values
+initialised for later drawing.  The SVG in buf is not closed.  See ValidBbox for boundingBox options.
+*/
+func (w *Map180) Map(boundingBox string, width int, pts Points, insetBbox string, buf *bytes.Buffer) (err error) {
+	// If the bbox is zero type then figure it out from the markers.
+	var b bbox
+	b, err = newBbox(boundingBox)
+	if err != nil {
+		return
+	}
+
+	m, err := b.newMap3857(width)
+	if err != nil {
+		return
+	}
+
+	buf.WriteString(`<?xml version="1.0"?>`)
+	buf.WriteString(fmt.Sprintf("<svg  viewBox=\"0 0 %d %d\"  xmlns=\"http://www.w3.org/2000/svg\">",
+		m.width, m.height))
+	if b.title != "" {
+		buf.WriteString(`<title>Map of ` + b.title + `.</title>`)
+	} else {
+		buf.WriteString(`<title>Map of ` + boundingBox + `.</title>`)
+	}
+
+	// Get the land and lakes layers from the cache.  This creates them
+	// if they haven't been cached already.
+	var landLakes string
+
+	err = mapLayers.Get(nil, m.toKey(), groupcache.StringSink(&landLakes))
+	if err != nil {
+		return
+	}
+
+	buf.WriteString(landLakes)
+
+	if insetBbox != "" {
+		var inset bbox
+		inset, err = newBbox(insetBbox)
+		if err != nil {
+			return
+		}
+		var in map3857
+		in, err = inset.newMap3857(80)
+		if err != nil {
+			return
+		}
+
+		var insetMap string
+		err = mapLayers.Get(nil, in.toKey(), groupcache.StringSink(&insetMap))
+		if err != nil {
+			return
+		}
+
+		// use 2 markers to put a the main map bbox as a rect
+		ibboxul := NewMarker(b.llx, b.ury, ``, ``, ``)
+		err = in.marker3857(&ibboxul)
+		if err != nil {
+			return
+		}
+
+		ibboxlr := NewMarker(b.urx, b.lly, ``, ``, ``)
+		err = in.marker3857(&ibboxlr)
+		if err != nil {
+			return
+		}
+
+		// if bbox rect is tiny make it bigger and shift it a little.
+		iw := int(ibboxlr.x - ibboxul.x)
+		if iw < 5 {
+			iw = 5
+			ibboxul.x = ibboxul.x - 2
+		}
+
+		ih := int(ibboxlr.y - ibboxul.y)
+		if ih < 5 {
+			ih = 5
+			ibboxul.y = ibboxul.y - 2
+		}
+
+		buf.WriteString(fmt.Sprintf("<g transform=\"translate(10,10)\"><rect x=\"-3\" y=\"-3\" width=\"%d\" height=\"%d\" rx=\"10\" ry=\"10\" fill=\"white\"/>",
+			in.width+6, in.height+6))
+
+		buf.WriteString(insetMap)
+
+		buf.WriteString(fmt.Sprintf("<rect x=\"%d\" y=\"%d\" width=\"%d\" height=\"%d\" fill=\"red\" opacity=\"0.5\"/>",
+			int(ibboxul.x), int(ibboxul.y), iw, ih) + `</g>`)
+
+	} // end of inset
+
+	for i, _ := range pts {
+		if pts[i].Latitude <= 85.0 && pts[i].Latitude >= -85.0 {
+			if err = m.point3857(&pts[i]); err != nil {
+				return
+			}
+		}
+	}
+
+	return
+}
+
 func (m *map3857) nePolySVG(zoom int, layer int) (string, error) {
 	// db errors are ignored. It is not an error for there to be no data in the bbox.
 	// should be possible to check for an empty row error but the pg driver
@@ -266,14 +369,6 @@ func layerGetter(ctx groupcache.Context, key string, dest groupcache.Sink) error
 		return err
 	}
 
-	stdDev := 4
-	coast := 10
-
-	if m.width > 150 {
-		stdDev = 10
-		coast = 30
-	}
-
 	l, err := m.labels()
 	if err != nil {
 		return err
@@ -281,8 +376,6 @@ func layerGetter(ctx groupcache.Context, key string, dest groupcache.Sink) error
 
 	var b bytes.Buffer
 
-	b.WriteString(fmt.Sprintf("<defs><filter id=\"f1\"><feGaussianBlur in=\"SourceGraphic\" stdDeviation=\"%d\" /></filter></defs>", stdDev))
-	b.WriteString(fmt.Sprintf("<path stroke-width=\"%d\" stroke-linejoin=\"round\" filter=\"url(#f1)\" stroke=\"azure\" d=\"%s\"/>", coast, land))
 	b.WriteString(fmt.Sprintf("<path fill=\"whitesmoke\" stroke-width=\"1\"  stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>", land))
 	b.WriteString(fmt.Sprintf("<path fill=\"azure\" stroke-width=\"1\"  stroke=\"lightslategrey\" d=\"%s\"/>", lakes))
 	b.WriteString(labelsToSVG(l))
