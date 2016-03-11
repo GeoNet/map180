@@ -13,11 +13,11 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 const (
 	width3857    = 40075016.6855785
+	Width3857    = 40075016.6855785
 	left3857     = width3857 / 2
 	right3857    = left3857 * -1.0
 	svgPolyQuery = `select array_to_string(array_agg(
@@ -33,10 +33,20 @@ var (
 	mapBounds      []bbox
 	namedMapBounds map[string]bbox
 	mapLayers      *groupcache.Group
-	cb             int64
+	landLayers     *groupcache.Group
+	lakeLayers     *groupcache.Group
 )
 
 type Map180 struct {
+}
+
+type Raw struct {
+	Land, Lakes    string  // land or lake polygons as strings for use in the d property of an SVG path.
+	Height, Width  int     // the height and width for the map.
+	DX             float64 // for scaling.
+	XShift, YShift float64 // for translation.
+	LLX            float64 // for translation.
+	CrossesCentral bool    // true if the map crosses the 180 meridian.
 }
 
 type map3857 struct {
@@ -60,8 +70,7 @@ func init() {
 /*
 Init returns an initialised Map180. d must have access to the map180 tables in the
 public schema.  cacheBytes is the size of the memory cache
-for land and lake layers.  region must be a valid Region.  Cache stats are logged once
-per minute.
+for land and lake layers.  region must be a valid Region.
 
 Example:
 
@@ -93,8 +102,8 @@ func Init(d *sql.DB, region Region, cacheBytes int64) (*Map180, error) {
 	db = d
 
 	mapLayers = groupcache.NewGroup("mapLayers", cacheBytes, groupcache.GetterFunc(layerGetter))
-	cb = cacheBytes
-	go logCacheStats()
+	landLayers = groupcache.NewGroup("landLayers", cacheBytes, groupcache.GetterFunc(landGetter))
+	lakeLayers = groupcache.NewGroup("lakeLayers", cacheBytes, groupcache.GetterFunc(lakeGetter))
 
 	return w, nil
 }
@@ -317,6 +326,74 @@ func (w *Map180) Map(boundingBox string, width int, pts Points, insetBbox string
 	return
 }
 
+/*
+MapRaw returns a Raw struct which can be used for drawing SVG maps e.g.,
+
+    raw, err := wm.MapRaw(bbox, width)
+    b := bytes.Buffer
+    b.WriteString(`<?xml version="1.0"?>`)
+    b.WriteString(fmt.Sprintf("<svg  viewBox=\"0 0 %d %d\"  xmlns=\"http://www.w3.org/2000/svg\">",
+    raw.Width, raw.Height))
+    b.WriteString(fmt.Sprintf("<rect x=\"0\" y=\"0\" width=\"%d\" height=\"%d\" style=\"fill: azure\"/>", raw.Width, raw.Height))
+    b.WriteString(fmt.Sprintf("<path style=\"fill: wheat; stroke-width: 1; stroke-linejoin: round; stroke: lightslategrey\" d=\"%s\"/>", raw.Land))
+    b.WriteString(fmt.Sprintf("<path style=\"fill: azure; stroke-width: 1; stroke-linejoin: round; stroke: lightslategrey\" d=\"%s\"/>", raw.Lakes))
+    b.WriteString("</svg>")
+
+The other properties can be used to scale and translate for drawing on the map e.g.,
+
+    type point struct {
+	latitude, longitude float64
+	x, y                float64
+    }
+
+    // create pts []point with x,y, set to EPSG3857 and latitude longitude EPSG4326
+    // range of pts ...
+
+    switch raw.CrossesCentral && p.longitude > -180.0 && p.longitude < 0.0 {
+	case true:
+		p.x = (p.x + map180.Width3857 - raw.LLX) * raw.DX
+		p.y = (p.y - math.Abs(raw.YShift)) * raw.DX
+	case false:
+		p.x = (p.x - math.Abs(raw.XShift)) * raw.DX
+		p.y = (p.y - math.Abs(raw.YShift)) * raw.DX
+    }
+
+    // draw p on SVG.
+
+
+*/
+func (w *Map180) MapRaw(boundingBox string, width int) (mr Raw, err error) {
+	var b bbox
+	if b, err = newBbox(boundingBox); err != nil {
+		return
+	}
+
+	var m map3857
+	if m, err = b.newMap3857(width); err != nil {
+		return
+	}
+
+	mr.Height = m.height
+	mr.Width = m.width
+	mr.DX = m.dx
+	mr.CrossesCentral = m.crossesCentral
+	mr.LLX = m.llx
+	mr.YShift = m.yshift
+	mr.XShift = m.xshift
+
+	// Get the land and lakes layers from the cache.  This creates them
+	// if they haven't been cached already.
+	if err = landLayers.Get(nil, m.toKey(), groupcache.StringSink(&mr.Land)); err != nil {
+		return
+	}
+
+	if err = lakeLayers.Get(nil, m.toKey(), groupcache.StringSink(&mr.Lakes)); err != nil {
+		return
+	}
+
+	return
+}
+
 func (m *map3857) nePolySVG(zoom int, layer int) (string, error) {
 	// db errors are ignored. It is not an error for there to be no data in the bbox.
 	// should be possible to check for an empty row error but the pg driver
@@ -381,6 +458,34 @@ func layerGetter(ctx groupcache.Context, key string, dest groupcache.Sink) error
 	b.WriteString(labelsToSVG(l))
 
 	return dest.SetString(b.String())
+}
+
+func landGetter(ctx groupcache.Context, key string, dest groupcache.Sink) error {
+	m, err := fromKey(key)
+	if err != nil {
+		return err
+	}
+
+	land, err := m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		return err
+	}
+
+	return dest.SetString(land)
+}
+
+func lakeGetter(ctx groupcache.Context, key string, dest groupcache.Sink) error {
+	m, err := fromKey(key)
+	if err != nil {
+		return err
+	}
+
+	lakes, err := m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		return err
+	}
+
+	return dest.SetString(lakes)
 }
 
 func (m *map3857) toKey() string {
@@ -456,15 +561,4 @@ func fromKey(key string) (m map3857, err error) {
 	}
 
 	return
-}
-
-func logCacheStats() {
-	s := time.Duration(60) * time.Second
-
-	for {
-		time.Sleep(s)
-		c := mapLayers.CacheStats(groupcache.MainCache)
-		log.Printf("map layers cache is using %d of %d bytes", c.Bytes, cb)
-		log.Printf("map layers cache items:%d gets:%d hits:%d evictions:%d", c.Items, c.Gets, c.Hits, c.Evictions)
-	}
 }
