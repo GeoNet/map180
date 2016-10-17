@@ -250,6 +250,9 @@ func (w *Map180) Map(boundingBox string, width int, pts Points, insetBbox string
 		buf.WriteString(`<title>Map of ` + boundingBox + `.</title>`)
 	}
 
+	b.WriteString(fmt.Sprintf("<rect x=\"0\" y=\"0\" width=\"%d\" height=\"%d\" style=\"fill: azure\"/>", width, m.height))
+	b.WriteString(fmt.Sprintf("<path style=\"fill: wheat; stroke-width: 1; stroke-linejoin: round; stroke: lightslategrey\" d=\"%s\"/>", raw.Land))
+
 	// Get the land and lakes layers from the cache.  This creates them
 	// if they haven't been cached already.
 	var landLakes string
@@ -453,7 +456,7 @@ func layerGetter(ctx groupcache.Context, key string, dest groupcache.Sink) error
 
 	var b bytes.Buffer
 
-	b.WriteString(fmt.Sprintf("<path fill=\"whitesmoke\" stroke-width=\"1\"  stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>", land))
+	b.WriteString(fmt.Sprintf("<path fill=\"wheat\" stroke-width=\"1\"  stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>", land))
 	b.WriteString(fmt.Sprintf("<path fill=\"azure\" stroke-width=\"1\"  stroke=\"lightslategrey\" d=\"%s\"/>", lakes))
 	b.WriteString(labelsToSVG(l))
 
