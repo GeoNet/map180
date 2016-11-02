@@ -315,7 +315,7 @@ func (w *Map180) Map(boundingBox string, width int, pts Points, insetBbox string
 
 	} // end of inset
 
-	for i, _ := range pts {
+	for i := range pts {
 		if pts[i].Latitude <= 85.0 && pts[i].Latitude >= -85.0 {
 			if err = m.point3857(&pts[i]); err != nil {
 				return
