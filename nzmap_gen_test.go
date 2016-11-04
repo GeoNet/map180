@@ -337,3 +337,173 @@ func TestNewZealand(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// New Zealand, Raoul, Chathams map.
+// the bbox is slightly larger than the grid to make the height the same as other
+// icon maps.
+func TestNewZealandRaoulChathams(t *testing.T) {
+	setup(t)
+	defer teardown()
+
+	b, err := newBbox("165,-48,-167.4,-20")
+	if err != nil {
+		t.Fatal("Getting bbox " + err.Error())
+	}
+
+	m, err := b.newMap3857(mediumWidth)
+	if err != nil {
+		t.Fatal("Getting map " + err.Error())
+	}
+
+	land, err := m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		t.Fatal("Getting land " + err.Error())
+	}
+
+	lakes, err := m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		t.Fatal("Getting coast")
+	}
+
+	var buf bytes.Buffer
+
+	buf.WriteString(fmt.Sprintf(responsive, m.width, m.height))
+	buf.WriteString(fmt.Sprintf(landPath, land))
+	// TODO no lakes are turning up?
+	buf.WriteString(fmt.Sprintf(lakePath, lakes))
+
+	var out bytes.Buffer
+
+	out.WriteString("package nzmap\n")
+	out.WriteString("var nzrcMedium = `" + buf.String() + "`\n\n")
+	out.WriteString("func init() {\n")
+
+	var xs float64
+	for x := 165.0; x <= 192; x++ {
+		xs = x
+		if x > 180 {
+			xs = xs - 360
+		}
+		for y := -48.0; y <= -20.0; y++ {
+			p := NewMarker(xs, y, "", "", "")
+			m.marker3857(&p)
+			out.WriteString(fmt.Sprintf("nzrcMediumPts[%.f][%.f] = pt{x:%d, y:%d}\n", x-165, y+48, int(p.x), int(p.y)))
+		}
+	}
+	out.WriteString("}\n")
+
+	err = ioutil.WriteFile("nzmap/nzrcmedium.go", out.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// New Zealand, Southern Ocean map.  1 degree grid.
+func TestNewZealandSouth(t *testing.T) {
+	setup(t)
+	defer teardown()
+
+	b, err := newBbox("156,-55,180,-34")
+	if err != nil {
+		t.Fatal("Getting bbox " + err.Error())
+	}
+
+	m, err := b.newMap3857(mediumWidth)
+	if err != nil {
+		t.Fatal("Getting map " + err.Error())
+	}
+
+	land, err := m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		t.Fatal("Getting land " + err.Error())
+	}
+
+	lakes, err := m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		t.Fatal("Getting coast " + err.Error())
+	}
+
+	var buf bytes.Buffer
+
+	buf.WriteString(fmt.Sprintf(responsive, m.width, m.height))
+	buf.WriteString(fmt.Sprintf(landPath, land))
+	buf.WriteString(fmt.Sprintf(lakePath, lakes))
+
+	var out bytes.Buffer
+
+	out.WriteString("package nzmap\n")
+	out.WriteString("var nzsMedium = `" + buf.String() + "`\n\n")
+	out.WriteString("func init() {\n")
+
+	for x := 156.0; x <= 180.0; x++ {
+		for y := -55.0; y <= -34.0; y++ {
+			p := NewMarker(x, y, "", "", "")
+			m.marker3857(&p)
+			out.WriteString(fmt.Sprintf("nzsMediumPts[%.f][%.f] = pt{x:%d, y:%d}\n", x-156, y+55, int(p.x), int(p.y)))
+		}
+	}
+	out.WriteString("}\n")
+
+	err = ioutil.WriteFile("nzmap/nzsmedium.go", out.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// New Zealand, Raoul
+func TestNewZealandRaoul(t *testing.T) {
+	setup(t)
+	defer teardown()
+
+	b, err := newBbox("165,-48,-174,-27")
+	if err != nil {
+		t.Fatal("Getting bbox " + err.Error())
+	}
+
+	m, err := b.newMap3857(mediumWidth)
+	if err != nil {
+		t.Fatal("Getting map " + err.Error())
+	}
+
+	land, err := m.nePolySVG(m.zoom, 0)
+	if err != nil {
+		t.Fatal("Getting land " + err.Error())
+	}
+
+	lakes, err := m.nePolySVG(m.zoom, 1)
+	if err != nil {
+		t.Fatal("Getting coast")
+	}
+
+	var buf bytes.Buffer
+
+	buf.WriteString(fmt.Sprintf(responsive, m.width, m.height))
+	buf.WriteString(fmt.Sprintf(landPath, land))
+	// TODO no lakes are turning up?
+	buf.WriteString(fmt.Sprintf(lakePath, lakes))
+
+	var out bytes.Buffer
+
+	out.WriteString("package nzmap\n")
+	out.WriteString("var nzrMedium = `" + buf.String() + "`\n\n")
+	out.WriteString("func init() {\n")
+
+	var xs float64
+	for x := 165.0; x <= 186; x++ {
+		xs = x
+		if x > 180 {
+			xs = xs - 360
+		}
+		for y := -48.0; y <= -27.0; y++ {
+			p := NewMarker(xs, y, "", "", "")
+			m.marker3857(&p)
+			out.WriteString(fmt.Sprintf("nzrMediumPts[%.f][%.f] = pt{x:%d, y:%d}\n", x-165, y+48, int(p.x), int(p.y)))
+		}
+	}
+	out.WriteString("}\n")
+
+	err = ioutil.WriteFile("nzmap/nzrmedium.go", out.Bytes(), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
