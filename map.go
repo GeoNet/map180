@@ -250,9 +250,6 @@ func (w *Map180) Map(boundingBox string, width int, pts Points, insetBbox string
 		buf.WriteString(`<title>Map of ` + boundingBox + `.</title>`)
 	}
 
-	b.WriteString(fmt.Sprintf("<rect x=\"0\" y=\"0\" width=\"%d\" height=\"%d\" style=\"fill: azure\"/>", width, m.height))
-	b.WriteString(fmt.Sprintf("<path style=\"fill: wheat; stroke-width: 1; stroke-linejoin: round; stroke: lightslategrey\" d=\"%s\"/>", raw.Land))
-
 	// Get the land and lakes layers from the cache.  This creates them
 	// if they haven't been cached already.
 	var landLakes string
@@ -318,7 +315,7 @@ func (w *Map180) Map(boundingBox string, width int, pts Points, insetBbox string
 
 	} // end of inset
 
-	for i, _ := range pts {
+	for i := range pts {
 		if pts[i].Latitude <= 85.0 && pts[i].Latitude >= -85.0 {
 			if err = m.point3857(&pts[i]); err != nil {
 				return
