@@ -75,13 +75,13 @@ const (
 	iconWidth   = 100
 	mediumWidth = 500
 	// used for drawing landmasses.
-	landPath = "<path fill=\"#f0f5f5\" stroke-width=\"0.75\" stroke-linejoin=\"round\" stroke=\"lightslategrey\" d=\"%s\"/>"
+	landPath = "<path class=\"nzmap-land\" d=\"%s\"/>"
 	// used for drawing lakes ontop of landmasses.
-	lakePath = "<path fill=\"white\" stroke-width=\"0.75\" stroke=\"lightslategrey\" d=\"%s\"/>"
+	lakePath = "<path class=\"nzmap-lake\" d=\"%s\"/>"
 	// fixed size SVG images (icons)
 	fixed = "<?xml version=\"1.0\"?><svg height=\"%d\" width=\"%d\" xmlns=\"http://www.w3.org/2000/svg\"><title>Map of New Zealand.</title>"
 	// responsive
-	responsive = "<?xml version=\"1.0\"?><svg viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\"><title>Map of New Zealand.</title>"
+	responsive = "<?xml version=\"1.0\"?><svg viewBox=\"0 0 %d %d\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><title>Map of New Zealand.</title>"
 )
 
 var wm *Map180
